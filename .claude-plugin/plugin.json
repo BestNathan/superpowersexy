@@ -1,0 +1,18 @@
+{
+  "name": "superpowersexy",
+  "description": "Claude Code skills library for structured coding-agent workflows",
+  "version": "0.1.0",
+  "author": {
+    "name": "BestNathan"
+  },
+  "homepage": "https://github.com/BestNathan/superpowersexy",
+  "repository": "git@github.com:BestNathan/superpowersexy.git",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "skills",
+    "coding-agent",
+    "requirements",
+    "architecture"
+  ]
+}
