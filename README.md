@@ -30,7 +30,7 @@ superpowersexy/
 From Claude Code, add this repository as a plugin marketplace and install the plugin:
 
 ```text
-/plugin marketplace add git@github.com:BestNathan/superpowersexy.git
+/plugin marketplace add https://github.com/BestNathan/superpowersexy
 /plugin install superpowersexy@superpowersexy-dev
 ```
 
