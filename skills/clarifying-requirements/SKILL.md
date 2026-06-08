@@ -31,7 +31,7 @@ Every request goes through this process. A one-liner, a bug report, a feature as
 You MUST create a task for each of these items and complete them in order:
 
 1. **Restate the request** — paraphrase what you heard, confirm understanding
-2. **Ask clarifying questions** — one at a time, understand purpose/constraints/scope/success criteria. MUST ask at least one question before reading any code.
+2. **Ask clarifying questions** — group by category (purpose, constraints, scope, success criteria, audience), ask all questions in the same category together. Each question MUST provide 2-3 concrete options, with one marked as **Recommended** and include the reasoning why. MUST ask at least one question before reading any code.
 3. **Explore current context** — AFTER initial clarification, check relevant files/docs to refine your understanding
 4. **Ask follow-up questions** — use what you found to ask better questions
 5. **Identify edge cases** — what happens at boundaries, what's explicitly out of scope
@@ -48,26 +48,30 @@ You MUST create a task for each of these items and complete them in order:
 digraph clarifying_requirements {
     rankdir=LR;
     "Restate request" [shape=box];
-    "Ask clarifying questions" [shape=box];
+    "Round 1: Purpose & Audience" [shape=box];
     "User answered?" [shape=diamond];
+    "Round 2: Scope" [shape=box];
+    "Round 3: Constraints" [shape=box];
+    "Round 4: Success criteria" [shape=box];
     "Explore context" [shape=box];
     "Follow-up questions" [shape=box];
     "Identify edge cases" [shape=box];
-    "Define success criteria" [shape=box];
     "Write requirements doc" [shape=box];
     "Self-review" [shape=box];
     "Subagent review?" [shape=diamond];
     "User reviews?" [shape=diamond];
     "Invoke brainstorming" [shape=doublecircle];
 
-    "Restate request" -> "Ask clarifying questions";
-    "Ask clarifying questions" -> "User answered?";
-    "User answered?" -> "Ask clarifying questions" [label="no, ask more"];
-    "User answered?" -> "Explore context" [label="yes, move on"];
+    "Restate request" -> "Round 1: Purpose & Audience";
+    "Round 1: Purpose & Audience" -> "User answered?";
+    "User answered?" -> "Round 1: Purpose & Audience" [label="no, ask more"];
+    "User answered?" -> "Round 2: Scope" [label="yes"];
+    "Round 2: Scope" -> "Round 3: Constraints";
+    "Round 3: Constraints" -> "Round 4: Success criteria";
+    "Round 4: Success criteria" -> "Explore context";
     "Explore context" -> "Follow-up questions";
     "Follow-up questions" -> "Identify edge cases";
-    "Identify edge cases" -> "Define success criteria";
-    "Define success criteria" -> "Write requirements doc";
+    "Identify edge cases" -> "Write requirements doc";
     "Write requirements doc" -> "Self-review";
     "Self-review" -> "Subagent review?";
     "Subagent review?" -> "Write requirements doc" [label="issues found"];
@@ -98,29 +102,127 @@ digraph clarifying_requirements {
 
 **Asking clarifying questions:**
 
-- One question at a time — never batch multiple questions into one message
-- Prefer multiple choice questions when possible; open-ended is fine when options aren't clear
-- Focus on understanding: **purpose** (why), **constraints** (what limits exist), **scope** (what's in/out), **success criteria** (how we know it's done)
+- **Group by category** — ask all questions in the same category together in one round. Categories: **purpose** (why), **constraints** (what limits exist), **scope** (what's in/out), **success criteria** (how we know it's done), **audience** (who is this for)
+- Round 1: Purpose & Audience questions → Round 2: Scope questions → Round 3: Constraints questions → Round 4: Success criteria questions
+- **Each question MUST present 2-3 concrete options** (A, B, C) with one marked as **⭐ Recommended** and include the reasoning why. This gives the user a starting point while making tradeoffs visible.
+- Options should represent meaningfully different approaches, not trivial variations. Each option should make a different tradeoff visible (simplicity vs power, speed vs quality, breadth vs depth).
+- Prefer multiple choice format; use open-ended only when you genuinely cannot enumerate reasonable options
+- Each round should contain 2-5 related questions presented together, not one at a time
 - If the request describes multiple independent features, flag this immediately. Don't refine details of a project that needs decomposition first.
 - For large requests, help decompose into sub-requirements. Each sub-requirement can get its own clarification cycle.
 
-**Good clarifying question examples:**
+**Good clarifying question examples (grouped by category, 2-3 options each):**
 
 ```
-What problem are you trying to solve? (purpose)
-  → "I want to add caching to the API" → "What's motivating this? Latency complaints, cost, something else?"
+=== Round 1: Purpose & Audience ===
 
-What constraints exist? (constraints)
-  → "We need real-time sync" → "What's the acceptable latency? 100ms? 1s? 10s?"
+Q1: What problem are you trying to solve?
+  Context: "I want to add caching to the API"
 
-What's in and out of scope? (scope)
-  → "Build a dashboard" → "What should this dashboard show? What should it explicitly NOT show?"
+  A) Reduce database load — the DB is the bottleneck, queries are expensive
+  B) Reduce API latency — users are complaining about slow responses
+  C) Reduce infrastructure cost — we're over-provisioned and need to scale down
 
-How will we know it's working? (success criteria)
-  → "Make it faster" → "What does 'faster' mean? Under what load? What's the target number?"
+  ⭐ Recommended: B — Reduce API latency
+  → Why: Most teams saying "add caching" are responding to user-facing slowness. If the real
+    driver is DB load (A) or cost (C), the caching strategy changes significantly — DB-focused
+    caching goes at the query layer, while latency-focused caching goes at the response layer.
+    Which of these best describes your situation?
 
-Who is the user? (audience)
-  → "Add an admin panel" → "Who specifically counts as an admin? What permissions do they have?"
+Q2: Who is the primary user of this feature?
+  Context: "The admin panel needs an export button"
+
+  A) Internal ops team — 5-10 people, technical, need raw data for analysis
+  B) Customer support — 50+ people, semi-technical, need formatted reports for customers
+  C) End customers — self-service, non-technical, need polished PDF/CSV downloads
+
+  ⭐ Recommended: A — Internal ops team
+  → Why: Admin panels are typically used by internal teams with higher trust levels. UX polish
+    matters less, raw data formats (CSV/JSON) are preferred. If it's customer-facing (C), the
+    export format and error handling need significantly more investment. Who's the audience?
+
+=== Round 2: Scope ===
+
+Q3: What scope makes sense for the first version?
+  Context: "Build a dashboard"
+
+  A) Minimal: 3-5 core metrics, single page, read-only — ship in 1 week
+  B) Standard: 8-12 metrics, 2-3 pages with filters, basic drill-down — ship in 2-3 weeks
+  C) Full: 20+ metrics, multi-page with custom date ranges, export, alerts — ship in 4-6 weeks
+
+  ⭐ Recommended: A — Minimal (3-5 core metrics)
+  → Why: Dashboards that show everything become noise. Starting with 3-5 metrics that answer
+    the most common operational questions gives fast delivery, real user feedback, and clear
+    direction for what to add next. What metrics must be in v1? What can wait?
+
+Q4: How should we phase the features mentioned?
+  Context: "User profiles with avatars, bios, settings, notification preferences, activity history"
+
+  A) Single phase: build everything at once
+  B) Two phases: Phase 1 = profiles + avatars + bios. Phase 2 = settings + notifications + history
+  C) Three phases: Phase 1 = profiles + avatars + bios. Phase 2 = settings + notifications.
+     Phase 3 = activity history
+
+  ⭐ Recommended: C — Three phases
+  → Why: Profiles with basic info deliver immediate value and unblock other features. Settings
+    and notifications are complex subsystems that benefit from real usage data. Activity history
+    likely depends on events we may not be emitting yet. Which phasing feels right?
+
+=== Round 3: Constraints ===
+
+Q5: What's the acceptable latency for sync?
+  Context: "We need real-time sync"
+
+  A) True real-time (<50ms) — requires WebSocket infrastructure, operational complexity high
+  B) Near-real-time (<500ms) — polling or SSE, covers most collaborative editing use cases
+  C) Eventually consistent (<5s) — simplest to build, acceptable for non-collaborative use
+
+  ⭐ Recommended: B — Near-real-time (<500ms)
+  → Why: True real-time requires significant infrastructure investment and is rarely necessary.
+    <500ms with polling or SSE covers virtually all "real-time" requirements at a fraction of
+    the complexity. Only go for A if you're building Google Docs-style simultaneous editing.
+    What's your use case?
+
+Q6: What's the timeline and who's available?
+  Context: "Make the search faster"
+
+  A) Quick win (1-3 days): add database indexes, basic query optimization — one dev
+  B) Moderate effort (1-2 weeks): add caching layer, optimize queries, tune relevance — one dev
+  C) Major investment (4-8 weeks): migrate to Elasticsearch, full-text search, faceting — team
+
+  ⭐ Recommended: B — Moderate effort (1-2 weeks)
+  → Why: Most "search is slow" problems come from missing indexes or unoptimized queries (A),
+    but once those are exhausted, a caching layer and relevance tuning (B) provide substantial
+    gains. Full Elasticsearch migration (C) is a multi-month project — only worth it if search
+    is a core product feature. What's your timeline and team capacity?
+
+=== Round 4: Success Criteria ===
+
+Q7: How will we know this is done and working?
+  Context: "Make it faster"
+
+  A) Specific latency target: p95 <200ms page load, p99 <500ms under 1000 concurrent users
+  B) Relative improvement: 2x faster than current, measured by the same benchmark
+  C) Qualitative: "feels snappy," no user complaints about speed in the first week post-launch
+
+  ⭐ Recommended: A — Specific latency target
+  → Why: "Faster" without a number is impossible to verify. A concrete p95/p99 target under
+    defined load gives everyone the same definition of done. If you don't have current baselines,
+    start with B (measure now, target 2x) and set A once you have data. What does "fast enough"
+    look like?
+
+Q8: What would make you say "this is not what I wanted"?
+  Context: setting failure expectations upfront
+
+  A) Doesn't solve the core problem we identified — the pain point remains
+  B) Too complex to use — adds friction instead of removing it
+  C) Breaks existing workflows — the cure is worse than the disease
+
+  ⭐ Recommended: A — Doesn't solve the core problem
+  → Why: The most common failure mode is building something that's technically correct but
+    doesn't address the actual pain point. The other two (B and C) are about execution quality.
+    Understanding which failure you fear most shapes how we validate the solution.
+    Which outcome worries you most?
 ```
 
 **Identifying edge cases:**
@@ -208,8 +310,9 @@ Wait for the user's response. If they request changes, make them and re-run the 
 
 ## Key Principles
 
-- **One question at a time** — Don't overwhelm with multiple questions
-- **Multiple choice preferred** — Easier to answer than open-ended when possible
+- **Group by category** — Same-type questions in one round: purpose first, then scope, then constraints, then success criteria
+- **2-3 options per question** — Every question presents A/B/C choices representing different tradeoffs. Never ask open-ended when options can be enumerated.
+- **Recommend with reasoning** — Exactly one option marked ⭐ Recommended with clear reasoning. Don't just ask, guide.
 - **Focus on WHAT, not HOW** — Requirements describe what to achieve, not how to achieve it
 - **Measurable criteria** — Every requirement must be verifiable
 - **Explicit non-goals** — What we're NOT building is as important as what we are
@@ -224,7 +327,10 @@ Wait for the user's response. If they request changes, make them and re-run the 
 | Assuming constraints | Ask about limits explicitly (time, budget, performance) |
 | Vague success criteria | Replace "it should work" with specific, measurable outcomes |
 | Skipping non-goals | Always define what's out of scope to prevent creep |
-| Batching questions | One question per message, always |
+| Asking questions without recommendations | Every question should include 2-3 options with one marked ⭐ Recommended + reasoning |
+| Asking open-ended when options exist | Enumerate the real choices. "What should we do?" → "Here are the 3 viable approaches..." |
+| Only giving one option (false choice) | Always provide 2-3 meaningfully different options. One option is not a choice. |
+| Mixing unrelated question types in one round | Group by category — don't ask a scope question and a constraints question together |
 | Requirements that prescribe implementation | "The system shall use Redis" → "The system shall cache responses with <50ms latency" |
 
 ## Common Rationalizations
@@ -241,6 +347,11 @@ Wait for the user's response. If they request changes, make them and re-run the 
 | "The real problem is X, not what they asked" | You might be right. But confirm with the user before solving a different problem than they asked for. |
 | "I found the problem while reading the code, let me fix it" | Finding a problem is not authorization to fix it. Clarify with the user first. |
 | "I have a good idea from exploring, let me propose solutions" | Solutions come after requirements, not during exploration. Ask clarifying questions first. |
+| "The user knows more than me, I shouldn't recommend" | You bring broad technical knowledge the user may not have. Your recommendation provides a starting point, even if they disagree. Asking without recommending is lazy, not respectful. |
+| "Grouping questions will overwhelm the user" | Related questions asked together reduce cognitive load — the user stays in one mental context. Scattered single questions force constant context-switching. |
+| "I don't know enough to recommend" | Make your best guess based on common patterns. If you're wrong, the user will correct you, and you'll learn. That's faster than open-ended exploration. |
+| "The answer is obvious, one option is enough" | One option is not a choice — it's a leading question. Always provide 2-3 options so the user can see the tradeoffs and make an informed decision. |
+| "I can't think of other options" | If you can only think of one approach, you haven't thought hard enough. Every decision has tradeoffs — enumerate them as options. Start with: simplest, most common, most powerful. |
 
 ## Red Flags - STOP and Start Over
 
@@ -253,8 +364,14 @@ Wait for the user's response. If they request changes, make them and re-run the 
 - "The problem is obviously X" without confirming with the user
 - "I found the issue, let me fix it" before clarifying scope
 - Thinking about WHICH files to change before knowing WHAT to build
+- Asking questions without providing recommended answers
+- Asking open-ended questions when 2-3 concrete options could be enumerated
+- Providing only one option (that's not a question, that's a leading statement)
+- "The user knows better, I shouldn't bias them with recommendations"
+- Asking one question at a time when others in the same category remain unanswered
+- Mixing scope, constraints, and success criteria questions in the same round
 
-**All of these mean: Stop. Restate the request. Ask clarifying questions.**
+**All of these mean: Stop. Restate the request. Ask clarifying questions grouped by category, with 2-3 options and a ⭐ Recommended choice.**
 
 ## Relationship to Other Skills
 
